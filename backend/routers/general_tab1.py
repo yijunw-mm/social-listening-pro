@@ -81,7 +81,7 @@ def keyword_frequency(group_id: Optional[List[str]] = Query(None),
 def new_keyword_prediction(group_id: Optional[List[str]] = Query(None),
                            group_year: Optional[int]=None,
                            year: Optional[int]=None,
-                           month: Optional[int] = None,
+                           month: Optional[List[int]] = Query(None),
                            quarter: Optional[int] = None,
                            top_k: int = 10):
     # ---- 1. Base SQL ----

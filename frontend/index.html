@@ -17,12 +17,11 @@
     <!-- Load Shared Layout -->
     <div id="layout"></div>
 
-    <script src="./src/js/layout-loader.js"></script>
-
     <script type="module" src="./src/js/pages/brand.js"></script>
 
     <script type="module">
-       import { loadBrandData } from './src/js/pages/brand.js';
+       import { loadBrandData, reloadChart } from './src/js/pages/brand.js';
+       import { loadLayout } from './src/js/layout-loader.js';
 
         async function loadPage() {
             // Wait for Chart.js to be available
@@ -101,7 +100,7 @@
 
                             <!-- 🧴 Baby Care Products -->
                             <optgroup label="Baby Care & Hygiene">
-                                <option value="johnson">Johnson’s Baby</option>
+                                <option value="johnson">Johnson's Baby</option>
                                 <option value="homie">Homie</option>
                                 <option value="hey tiger">Hey Tiger</option>
                                 <option value="nino nana">Nino Nana</option>
@@ -115,7 +114,10 @@
                     <div class="grid grid-cols-1 gap-6 mt-6" id="chartsContainer">
 
                         <div class="bg-[#1f252f] p-4 rounded-lg" style="position: relative;">
-                            <h3 class="text-white mb-2">Top Keywords</h3>
+                            <h3 class="text-white mb-4">Top Keywords</h3>
+                            <button id="keywordAnalyzeBtn" class="bg-[#C990B8] hover:bg-[#db2777] text-white font-semibold py-2 px-4 rounded-lg mb-4">
+                                Analyze
+                            </button>
                             <canvas id="keywordChart"></canvas>
                             <!-- Loading Overlay for Keywords Chart -->
                             <div id="loadingOverlay-keywordChart" class="chart-loading-overlay">
@@ -125,7 +127,10 @@
                         </div>
 
                         <div class="bg-[#1f252f] p-4 rounded-lg" style="position: relative;">
-                            <h3 class="text-white mb-2">Sentiment</h3>
+                            <h3 class="text-white mb-4">Sentiment</h3>
+                            <button id="sentimentAnalyzeBtn" class="bg-[#C990B8] hover:bg-[#db2777] text-white font-semibold py-2 px-4 rounded-lg mb-4">
+                                Analyze
+                            </button>
                             <div class="flex justify-center">
                                 <canvas id="sentimentChart" class="max-w-[320px] max-h-[320px]"></canvas>
                             </div>
@@ -137,7 +142,10 @@
                         </div>
 
                         <div class="bg-[#1f252f] p-4 rounded-lg" style="position: relative;">
-                            <h3 class="text-white mb-2">Consumer Perception</h3>
+                            <h3 class="text-white mb-4">Consumer Perception</h3>
+                            <button id="perceptionAnalyzeBtn" class="bg-[#C990B8] hover:bg-[#db2777] text-white font-semibold py-2 px-4 rounded-lg mb-4">
+                                Analyze
+                            </button>
                             <canvas id="perceptionChart"></canvas>
                             <!-- Loading Overlay for Perception Chart -->
                             <div id="loadingOverlay-perceptionChart" class="chart-loading-overlay">
@@ -188,19 +196,44 @@
             // Wait for canvases to be rendered with actual dimensions
             await waitForCanvasesReady();
 
-            // Add event listener to brand selector
-            const brandSelector = document.getElementById("brandSelector");
-
-            if (brandSelector) {
-                brandSelector.addEventListener('change', async function() {
-                    console.log('Brand changed to:', this.value);
-                    await loadBrandData(this.value);
+            // Add event listeners to individual analyze buttons
+            const keywordAnalyzeBtn = document.getElementById("keywordAnalyzeBtn");
+            if (keywordAnalyzeBtn) {
+                keywordAnalyzeBtn.addEventListener('click', async function() {
+                    const brandSelector = document.getElementById("brandSelector");
+                    const selectedBrand = brandSelector.value;
+                    console.log('Analyzing keywords for brand:', selectedBrand);
+                    await reloadChart('keywordChart', selectedBrand);
                 });
             }
 
-            // Now that canvas elements are painted and visible, load the chart data
-            console.log('Loading brand data...');
-            await loadBrandData();
+            const sentimentAnalyzeBtn = document.getElementById("sentimentAnalyzeBtn");
+            if (sentimentAnalyzeBtn) {
+                sentimentAnalyzeBtn.addEventListener('click', async function() {
+                    const brandSelector = document.getElementById("brandSelector");
+                    const selectedBrand = brandSelector.value;
+                    console.log('Analyzing sentiment for brand:', selectedBrand);
+                    await reloadChart('sentimentChart', selectedBrand);
+                });
+            }
+
+            const perceptionAnalyzeBtn = document.getElementById("perceptionAnalyzeBtn");
+            if (perceptionAnalyzeBtn) {
+                perceptionAnalyzeBtn.addEventListener('click', async function() {
+                    const brandSelector = document.getElementById("brandSelector");
+                    const selectedBrand = brandSelector.value;
+                    console.log('Analyzing perception for brand:', selectedBrand);
+                    await reloadChart('perceptionChart', selectedBrand);
+                });
+            }
+
+            // Listen for group chat changes and reload all charts
+            window.addEventListener('groupChatChanged', async function() {
+                const brandSelector = document.getElementById("brandSelector");
+                const selectedBrand = brandSelector ? brandSelector.value : "mamypoko";
+                console.log('Group chat selection changed, reloading all charts for brand:', selectedBrand);
+                await loadBrandData(selectedBrand);
+            });
         }
 
         // Helper function to ensure canvases are ready

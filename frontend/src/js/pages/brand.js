@@ -63,7 +63,16 @@ async function loadChart(canvasId, brandName, apiFunc, configBuilder, extraParam
     }
 
     try {
-        const data = await apiFunc({ brand_name: brandName, ...extraParams });
+        // Get selected group chat from localStorage
+        const groupChat = window.getSelectedGroupChats ? window.getSelectedGroupChats() : [];
+        const params = { brand_name: brandName, ...extraParams };
+        if (groupChat && Array.isArray(groupChat) && groupChat.length > 0) {
+            params.group_id = groupChat; // Pass as array, not joined string
+        }
+
+        console.log("API Params:", params);
+
+        const data = await apiFunc(params);
         console.log(`Data received for ${canvasId}:`, data); // Debug log
 
         // Only render if data has changed or chart doesn't exist

@@ -1,5 +1,19 @@
 const BASE_URL = "http://127.0.0.1:8000";
 
+// Helper function to build URL with query parameters
+function buildURL(endpoint, params = {}) {
+    const url = new URL(`${BASE_URL}${endpoint}`);
+    Object.keys(params).forEach(key => {
+        const value = params[key];
+        // Handle arrays by appending each value separately (for FastAPI List[str] params)
+        if (Array.isArray(value)) {
+            value.forEach(v => url.searchParams.append(key, v));
+        } else {
+            url.searchParams.append(key, value);
+        }
+    });
+    return url;
+}
 
 //group chat number 
 async function groupChat(params = {}) {
@@ -25,12 +39,7 @@ async function groupChat(params = {}) {
 
 //general keyword frequency
 async function keywordFrequency(params = {}) {
-    const url = new URL(`${BASE_URL}/keyword-frequency`);
-
-    // attach params to URL
-    Object.keys(params).forEach(key => {
-        url.searchParams.append(key, params[key]);
-    });
+    const url = buildURL('/keyword-frequency', params);
 
     const response = await fetch(url, {
         method: "GET",
@@ -44,14 +53,10 @@ async function keywordFrequency(params = {}) {
     return await response.json();
 }
 
-// new_keywords 
+// new_keywords
 async function new_keywords(params = {}) {
-    const url = new URL(`${BASE_URL}/new-keyword-prediction`);
-    
-    // attach params to URL
-    Object.keys(params).forEach(key => {
-        url.searchParams.append(key, params[key]);
-    });
+    const url = buildURL('/new-keyword-prediction', params);
+
     const response = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
@@ -66,11 +71,7 @@ async function new_keywords(params = {}) {
 
 //BRAND keyword
 async function get_brand_keyword(params = {}) {
-    const url = new URL(`${BASE_URL}/brand/keyword-frequency`);
-
-    Object.keys(params).forEach(key => {
-        url.searchParams.append(key, params[key]);
-    });
+    const url = buildURL('/brand/keyword-frequency', params);
 
     console.log('Fetching URL:', url.toString());
 
@@ -88,7 +89,7 @@ async function get_brand_keyword(params = {}) {
 
     const data = await response.json();
     console.log('Raw data received:', JSON.stringify(data));
-    
+
     return data;
 }
 
@@ -131,33 +132,26 @@ async function remove_brand_keyword(params = {}) {
     return await response.json();
 }
 
-//brand sentiment
+//brand sentiment 
 async function get_sentiment_analysis(params = {}) {
-    const url = new URL(`${BASE_URL}/brand/sentiment-analysis`);
-    
-    Object.keys(params).forEach(key => {
-        url.searchParams.append(key, params[key]);
-    });
+    const url = buildURL('/brand/sentiment-analysis', params);
+
     const response = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
     });
-    
+
     if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
-    
+
     return await response.json();
 }
 
+
 // consumer perception
 async function get_consumer_perception(params = {}) {
-    const url = new URL(`${BASE_URL}/brand/consumer-perception`);
-
-    Object.keys(params).forEach(key => {
-        url.searchParams.append(key, params[key]);
-    }
-    );
+    const url = buildURL('/brand/consumer-perception', params);
 
     const response = await fetch(url, {
         method: "GET",
@@ -179,18 +173,15 @@ async function get_consumer_perception(params = {}) {
 
 }
 
-//time-compare keyword frequency 
+//time-compare keyword frequency
 async function get_time_compare_frequency(params = {}) {
-    const url = new URL(`${BASE_URL}/brand/time-compare/frequency`);
-    
-    Object.keys(params).forEach(key => {
-        url.searchParams.append(key, params[key]);
-    }); 
+    const url = buildURL('/brand/time-compare/frequency', params);
+
     const response = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
     });
-    
+
     if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
@@ -199,16 +190,13 @@ async function get_time_compare_frequency(params = {}) {
 
 //time-compare sentiment
 async function get_time_compare_sentiment(params = {}) {
-    const url = new URL(`${BASE_URL}/brand/time-compare/sentiment`);
-    
-    Object.keys(params).forEach(key => {
-        url.searchParams.append(key, params[key]);
-    }); 
+    const url = buildURL('/brand/time-compare/sentiment', params);
+
     const response = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
     });
-    
+
     if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
@@ -217,11 +205,8 @@ async function get_time_compare_sentiment(params = {}) {
 
 //time compare share of voice
 async function get_time_compare_share_of_voice(params = {}) {
-    const url = new URL(`${BASE_URL}/category/time-compare/share-of-voice`);
+    const url = buildURL('/category/time-compare/share-of-voice', params);
 
-    Object.keys(params).forEach(key => {
-        url.searchParams.append(key, params[key]);
-    });
     const response = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
@@ -233,17 +218,41 @@ async function get_time_compare_share_of_voice(params = {}) {
     return await response.json();
 }
 
+//category keyword frequency (category-level data for Consumer Perception tab)
+async function get_category_keyword_frequency(params = {}) {
+    const url = buildURL('/category/keyword-frequency', params);
+
+    const response = await fetch(url, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+    });
+    if(!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`)
+    }
+
+    return await response.json();
+}
+
+//brand comparison keyword frequncy (brand-level data)
+async function get_comparison_keyword_frequency(params = {}) {
+    const url = buildURL('/category/keyword-frequency-by-brand', params);
+
+    const response = await fetch(url, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+    });
+    if(!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`)
+    }
+
+    return await response.json();
+}
 
 
 //brand comparison share of voice
 async function get_share_of_voice(params = {}) {
-    const url = new URL(`${BASE_URL}/category/share-of-voice`);
+    const url = buildURL('/category/share-of-voice', params);
 
-    Object.keys(params).forEach(key => {
-        url.searchParams.append(key, params[key]);
-    }
-    );
-    
     const response = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
@@ -287,8 +296,8 @@ async function get_comparison_consumer_perception(params = {}) {
         return [{ word: "Error", count: 0, error: data.error }];
     }
 
-    if(data && typeof data === 'object' && data.associated_keywords){
-        return data.associated_keywords;
+    if(data && typeof data === 'object' && data.associated_words){
+        return data.associated_words;
     }
     return []
 }
@@ -306,5 +315,7 @@ export {
     get_time_compare_sentiment,
     get_time_compare_share_of_voice,
     get_share_of_voice,
+    get_category_keyword_frequency,
+    get_comparison_keyword_frequency,
     get_comparison_consumer_perception
 };

@@ -6,7 +6,7 @@ import re
 from sklearn.feature_extraction.text import CountVectorizer
 from keybert import KeyBERT
 from backend.model_loader import kw_model,encoder
-from sentence_transformers import SentenceTransformer, util 
+from sentence_transformers import SentenceTransformer, util
 import spacy
 from sklearn.cluster import KMeans
 from backend.data_loader import query_chat, load_default_groups,load_groups_by_year
@@ -27,8 +27,8 @@ def _normalize_quotes(s: str) -> str:
     if not isinstance(s, str):
         return ""
     return (
-        s.replace("’", "'")
-         .replace("‘", "'")
+        s.replace("'", "'")
+         .replace("'", "'")
          .replace("`", "'")
          .lower()
          .replace("'", "")
@@ -39,9 +39,9 @@ def _normalize_quotes(s: str) -> str:
 def _build_keyword_pattern(kw: str) -> re.Pattern:
     k = _normalize_quotes(kw)
     k = re.escape(k)
-    
+
     k = k.replace(r"\-", r"(?:-|\\s)")
-    
+
     k = k.replace(r"\ ", r"\s+")
     return re.compile(rf"(?<!\w){k}(?!\w)", flags=re.IGNORECASE)
 
@@ -65,11 +65,11 @@ def get_share_of_voice(
     month: Optional[List[int]] = Query(None),
     quarter: Optional[int] = None
     ):
-    
+
     # --- 2. basic query
     query = """
-    SELECT 
-        group_id, clean_text 
+    SELECT
+        group_id, clean_text
     FROM chat WHERE clean_text IS NOT NULL"""
     params = []
     # ---- Default groups ----
@@ -185,7 +185,7 @@ def extract_clean_brand_keywords_auto(texts, brand_name, top_k=15):
     # Step 3️⃣ POS keep noun, adj
     def is_meaningful(phrase):
         docs = list(nlp.pipe(keywords,disable=["ner"]))
-        keywords = [kw for kw,doc in zip(keywords,docs) 
+        keywords = [kw for kw,doc in zip(keywords,docs)
                 if any(t.pos_ in ["ADJ", "NOUN"] for t in doc)]
 
     # Step 4️⃣ calculate semantic centre
@@ -225,8 +225,8 @@ def extract_context(text, brand_list, window=10):
     return None
 
 @router.get("/category/consumer-perception")
-def category_consumer_perception(category_name:str, 
-                                top_k:int=20, 
+def category_consumer_perception(category_name:str,
+                                top_k:int=20,
                                 group_id:Optional[List[str]]=Query(None),
                                 group_year:Optional[int]=None,
                                 year: Optional[int] =None,
@@ -235,11 +235,11 @@ def category_consumer_perception(category_name:str,
     brand_in_category = [b for b,cats in brand_category_map.items() if category_name in cats]
     if not brand_in_category:
         return {"error":f"category '{category_name}' not found"}
-    
+
     # --- 2. basic query
     query = """
-    SELECT 
-        group_id, clean_text 
+    SELECT
+        group_id, clean_text
     FROM chat WHERE clean_text IS NOT NULL"""
     params = []
     # ---- Default groups ----
@@ -270,7 +270,7 @@ def category_consumer_perception(category_name:str,
     df = query_chat(query, params)
     if df.empty:
         return {"category":category_name,"associate_word":[]}
-    
+
     #  extract brand name relevant text
     pattern = "|".join([rf"\b{re.escape(b)}\b" for b in brand_in_category])
     relevant_texts = (
@@ -418,7 +418,3 @@ def category_keyword_frequency(
         "total_mentions": len(context_texts),
         "keywords": result,
     }
-
-
-
-
