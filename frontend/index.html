@@ -20,7 +20,7 @@
     <script type="module" src="./src/js/pages/brand.js"></script>
 
     <script type="module">
-       import { loadBrandData, reloadChart } from './src/js/pages/brand.js';
+       import { loadBrandKeywordData, loadSentimentAnalysisData, loadConsumerPerceptionData, loadAllBrandData } from './src/js/pages/brand.js';
        import { loadLayout } from './src/js/layout-loader.js';
 
         async function loadPage() {
@@ -203,7 +203,7 @@
                     const brandSelector = document.getElementById("brandSelector");
                     const selectedBrand = brandSelector.value;
                     console.log('Analyzing keywords for brand:', selectedBrand);
-                    await reloadChart('keywordChart', selectedBrand);
+                    await loadBrandKeywordData(selectedBrand);
                 });
             }
 
@@ -213,7 +213,7 @@
                     const brandSelector = document.getElementById("brandSelector");
                     const selectedBrand = brandSelector.value;
                     console.log('Analyzing sentiment for brand:', selectedBrand);
-                    await reloadChart('sentimentChart', selectedBrand);
+                    await loadSentimentAnalysisData(selectedBrand);
                 });
             }
 
@@ -223,7 +223,7 @@
                     const brandSelector = document.getElementById("brandSelector");
                     const selectedBrand = brandSelector.value;
                     console.log('Analyzing perception for brand:', selectedBrand);
-                    await reloadChart('perceptionChart', selectedBrand);
+                    await loadConsumerPerceptionData(selectedBrand);
                 });
             }
 
@@ -232,7 +232,7 @@
                 const brandSelector = document.getElementById("brandSelector");
                 const selectedBrand = brandSelector ? brandSelector.value : "mamypoko";
                 console.log('Group chat selection changed, reloading all charts for brand:', selectedBrand);
-                await loadBrandData(selectedBrand);
+                await loadAllBrandData(selectedBrand);
             });
         }
 

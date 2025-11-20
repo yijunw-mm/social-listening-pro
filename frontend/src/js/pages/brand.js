@@ -8,90 +8,132 @@ import {
 Chart.register(ChartDataLabels);
 
 let chartInstances = {};
-let chartDataCache = {}; // Store previous data for comparison
 
-export async function loadBrandData(brandName = null) {
-    // Get brand from parameter or dropdown selector
-    if (!brandName) {
-        const selector = document.getElementById("brandSelector");
-        brandName = selector ? selector.value : "mamypoko"; // Default to first brand if selector not found
-    }
-
-    // Load charts sequentially - each will show/hide its own loading indicator independently
-    await loadChart("keywordChart", brandName, get_brand_keyword, buildKeywordConfig);
-    await loadChart("sentimentChart", brandName, get_sentiment_analysis, buildSentimentConfig);
-    await loadChart("perceptionChart", brandName, get_consumer_perception, buildPerceptionConfig, { top_k: 20 });
+// Export individual loading functions for each chart
+export async function loadBrandKeywordData(brandName) {
+    console.log('Loading brand keyword data:', { brandName });
+    await loadBrandKeyword(brandName);
 }
 
-// Force reload a specific chart (bypasses cache)
-export async function reloadChart(chartId, brandName = null) {
-    delete chartDataCache[chartId];
-
-    // Get brand from parameter or dropdown selector
-    if (!brandName) {
-        const selector = document.getElementById("brandSelector");
-        brandName = selector ? selector.value : "mamypoko";
-    }
-
-    const chartMap = {
-        keywordChart: { apiFunc: get_brand_keyword, configBuilder: buildKeywordConfig, params: {} },
-        sentimentChart: { apiFunc: get_sentiment_analysis, configBuilder: buildSentimentConfig, params: {} },
-        perceptionChart: { apiFunc: get_consumer_perception, configBuilder: buildPerceptionConfig, params: { top_k: 20 } }
-    };
-
-    const chart = chartMap[chartId];
-    if (chart) {
-        await loadChart(chartId, brandName, chart.apiFunc, chart.configBuilder, chart.params);
-    }
+export async function loadSentimentAnalysisData(brandName) {
+    console.log('Loading sentiment analysis data:', { brandName });
+    await loadSentimentAnalysis(brandName);
 }
 
-async function loadChart(canvasId, brandName, apiFunc, configBuilder, extraParams = {}) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return console.error(`Canvas #${canvasId} not found`);
+export async function loadConsumerPerceptionData(brandName) {
+    console.log('Loading consumer perception data:', { brandName });
+    await loadConsumerPerception(brandName);
+}
 
-    // Get the loading overlay for this specific chart
+// Load all brand charts sequentially
+export async function loadAllBrandData(brandName) {
+    console.log('Loading all brand data sequentially...');
+    await loadBrandKeyword(brandName);
+    await loadSentimentAnalysis(brandName);
+    await loadConsumerPerception(brandName);
+    console.log('All brand data loaded');
+}
+
+// Individual chart loading functions
+async function loadBrandKeyword(brandName) {
+    const canvasId = 'keywordChart';
     const loadingOverlay = document.getElementById(`loadingOverlay-${canvasId}`);
 
-    // Show loading overlay
-    if (loadingOverlay) {
-        loadingOverlay.classList.add('active');
-    }
-
-    // Wait for real size only if chart doesn't exist yet
-    if (!chartInstances[canvasId]) {
-        await waitForCanvasSize(canvas);
-    }
+    if (loadingOverlay) loadingOverlay.classList.add('active');
 
     try {
-        // Get selected group chat from localStorage
         const groupChat = window.getSelectedGroupChats ? window.getSelectedGroupChats() : [];
-        const params = { brand_name: brandName, ...extraParams };
+        const params = { brand_name: brandName };
         if (groupChat && Array.isArray(groupChat) && groupChat.length > 0) {
-            params.group_id = groupChat; // Pass as array, not joined string
+            params.group_id = groupChat;
         }
 
         console.log("API Params:", params);
 
-        const data = await apiFunc(params);
-        console.log(`Data received for ${canvasId}:`, data); // Debug log
+        const data = await get_brand_keyword(params);
+        console.log(`Data received for ${canvasId}:`, data);
 
-        // Only render if data has changed or chart doesn't exist
-        if (hasDataChanged(canvasId, data)) {
-            renderChart(canvasId, data, configBuilder);
-            chartDataCache[canvasId] = data;
+        if (isValidData(data)) {
+            renderChart(canvasId, data, buildKeywordConfig);
         } else {
-            console.log(`Skipping ${canvasId} - data unchanged`);
+            const canvas = document.getElementById(canvasId);
+            showNoDataMessage(canvas.getContext("2d"), canvas, "No data available");
         }
     } catch (err) {
         console.error(`Error loading ${canvasId}:`, err);
+        const canvas = document.getElementById(canvasId);
         showNoDataMessage(canvas.getContext("2d"), canvas, `Error loading ${canvasId}`);
     } finally {
-        // Hide loading overlay
-        if (loadingOverlay) {
-            loadingOverlay.classList.remove('active');
-        }
+        if (loadingOverlay) loadingOverlay.classList.remove('active');
     }
 }
+
+async function loadSentimentAnalysis(brandName) {
+    const canvasId = 'sentimentChart';
+    const loadingOverlay = document.getElementById(`loadingOverlay-${canvasId}`);
+
+    if (loadingOverlay) loadingOverlay.classList.add('active');
+
+    try {
+        const groupChat = window.getSelectedGroupChats ? window.getSelectedGroupChats() : [];
+        const params = { brand_name: brandName };
+        if (groupChat && Array.isArray(groupChat) && groupChat.length > 0) {
+            params.group_id = groupChat;
+        }
+
+        console.log("API Params:", params);
+
+        const data = await get_sentiment_analysis(params);
+        console.log(`Data received for ${canvasId}:`, data);
+
+        if (isValidData(data)) {
+            renderChart(canvasId, data, buildSentimentConfig);
+        } else {
+            const canvas = document.getElementById(canvasId);
+            showNoDataMessage(canvas.getContext("2d"), canvas, "No data available");
+        }
+    } catch (err) {
+        console.error(`Error loading ${canvasId}:`, err);
+        const canvas = document.getElementById(canvasId);
+        showNoDataMessage(canvas.getContext("2d"), canvas, `Error loading ${canvasId}`);
+    } finally {
+        if (loadingOverlay) loadingOverlay.classList.remove('active');
+    }
+}
+
+async function loadConsumerPerception(brandName) {
+    const canvasId = 'perceptionChart';
+    const loadingOverlay = document.getElementById(`loadingOverlay-${canvasId}`);
+
+    if (loadingOverlay) loadingOverlay.classList.add('active');
+
+    try {
+        const groupChat = window.getSelectedGroupChats ? window.getSelectedGroupChats() : [];
+        const params = { brand_name: brandName, top_k: 20 };
+        if (groupChat && Array.isArray(groupChat) && groupChat.length > 0) {
+            params.group_id = groupChat;
+        }
+
+        console.log("API Params:", params);
+
+        const data = await get_consumer_perception(params);
+        console.log(`Data received for ${canvasId}:`, data);
+
+        if (isValidData(data)) {
+            renderChart(canvasId, data, buildPerceptionConfig);
+        } else {
+            const canvas = document.getElementById(canvasId);
+            showNoDataMessage(canvas.getContext("2d"), canvas, "No data available");
+        }
+    } catch (err) {
+        console.error(`Error loading ${canvasId}:`, err);
+        const canvas = document.getElementById(canvasId);
+        showNoDataMessage(canvas.getContext("2d"), canvas, `Error loading ${canvasId}`);
+    } finally {
+        if (loadingOverlay) loadingOverlay.classList.remove('active');
+    }
+}
+
 
 // Chart Rendering Core
 function renderChart(canvasId, data, configBuilder) {
@@ -325,33 +367,10 @@ const baseOptions = {
 };
 
 // ---- HELPERS ----
-function hasDataChanged(canvasId, newData) {
-    // If chart doesn't exist yet, data has "changed" (needs initial render)
-    if (!chartInstances[canvasId] || !chartDataCache[canvasId]) {
-        return true;
-    }
-
-    // Compare stringified data to detect changes
-    const oldDataStr = JSON.stringify(chartDataCache[canvasId]);
-    const newDataStr = JSON.stringify(newData);
-
-    return oldDataStr !== newDataStr;
-}
-
 function isValidData(data) {
     return Array.isArray(data) ? data.length > 0 :
         data?.sentiment_count?.length > 0 ||
         data?.associated_words?.length > 0;
-}
-
-async function waitForCanvasSize(canvas) {
-    return new Promise(resolve => {
-        function check() {
-            if (canvas.clientWidth > 50 && canvas.clientHeight > 50) resolve(true);
-            else requestAnimationFrame(check);
-        }
-        check();
-    });
 }
 
 function showNoDataMessage(ctx, canvas, message) {
