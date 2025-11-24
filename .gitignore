@@ -207,3 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 data/
+roberta-finetune-results/
+roberta-sentiment-finetuned/
+*.safetensors
+*.pt 
+*.bin 

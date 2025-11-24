@@ -2,7 +2,7 @@ import pandas as pd
 import duckdb
 from functools import lru_cache
 
-DB_PATH= ":memory:"
+DB_PATH= "data/chat_cache.duckdb"
 
 @lru_cache(maxsize=1)
 def load_chat_data():
@@ -84,4 +84,60 @@ def query_chat(sql: str, params=None):
 
 
 
-   
+# === sentiment cache layer ===
+from datetime import datetime
+
+def init_sentiment_cache(con):
+    """initialize cache table(just execute once)"""
+    con.execute("""
+    CREATE TABLE IF NOT EXISTS sentiment_cache (
+        text VARCHAR,
+        sentiment VARCHAR,
+        score DOUBLE,
+        rule_applied VARCHAR,
+        updated_at TIMESTAMP
+    )
+    """)
+
+def get_cached_sentiment(text: str):
+    """query from cached table"""
+    con, _ = load_chat_data()
+    init_sentiment_cache(con)
+    result = con.execute(
+        "SELECT sentiment, score, rule_applied FROM sentiment_cache WHERE text = ?", 
+        [text]
+    ).fetchone()
+    if result:
+        return {"sentiment": result[0], "score": result[1], "rule_applied": result[2]}
+    return None
+
+
+def save_sentiment_cache(text: str, sentiment: str, score: float, rule_applied: str):
+    """save predicted sentiment to DuckDB"""
+    con, _ = load_chat_data()
+    init_sentiment_cache(con)
+    con.execute("""
+        INSERT INTO sentiment_cache VALUES (?, ?, ?, ?, ?)
+    """, [text, sentiment, score, rule_applied, datetime.now()])
+
+
+def get_all_cached_sentiments(limit: int = 1000):
+    con, _ = load_chat_data()
+    init_sentiment_cache(con)
+    return con.execute("SELECT * FROM sentiment_cache LIMIT ?", [limit]).fetch_df()
+
+
+def update_sentiment_cache(text: str, new_sentiment: str, new_score: float = None, new_rule: str = None):
+    """
+    update the setement label(human changes)
+    """
+    con, _ = load_chat_data()
+    init_sentiment_cache(con)
+    con.execute("""
+        UPDATE sentiment_cache
+        SET sentiment = ?, 
+            score = COALESCE(?, score),
+            rule_applied = COALESCE(?, rule_applied),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE text = ?
+    """, [new_sentiment, new_score, new_rule, text])

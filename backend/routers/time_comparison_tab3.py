@@ -4,7 +4,7 @@ import pandas as pd
 from collections import Counter, defaultdict
 import json
 import re
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
 from backend.data_loader import query_chat, load_default_groups,load_groups_by_year
 
 router = APIRouter()
@@ -12,8 +12,9 @@ router = APIRouter()
 # load brand keywrod
 brand_keyword_df = pd.read_csv("data/other_data/newest_brand_keywords.csv",keep_default_na=False,na_values=[""])  
 brand_keyword_dict = brand_keyword_df.groupby("brand")["keyword"].apply(list).to_dict()
+# temporary store user-add keywords
+custom_keywords_dict = {brand: set() for brand in brand_keyword_dict}
 
-analyzer = SentimentIntensityAnalyzer()
 
 def extract_brand_context(df: pd.DataFrame, brand: str, brand_keyword_map: dict,
                           window_size: int = 6, merge_overlap: bool = True):
@@ -74,7 +75,10 @@ def compare_keyword_frequency(
     
     if brand_name not in brand_keyword_dict:
         return {"error": f"Brand '{brand_name}' not found."}
-    keywords = brand_keyword_dict[brand_name]
+    base_keywords = set(brand_keyword_dict[brand_name])
+    custom_keywords = custom_keywords_dict.get(brand_name, set())
+    all_keywords = list(base_keywords.union(custom_keywords))
+    #keywords = brand_keyword_dict[brand_name]
 
     # --- 2. basic query
     query = """
@@ -131,7 +135,7 @@ def compare_keyword_frequency(
         freq_counter = Counter()
         for text in context_texts:
             t = text.lower()
-            for kw in keywords:
+            for kw in all_keywords:
                 if re.search(rf"\b{re.escape(kw.lower())}\b", t):
                     freq_counter[kw] += 1
         if not freq_counter:
@@ -152,216 +156,6 @@ def compare_keyword_frequency(
         }
     }
 
-#-------sentiment analysis------
-with open ("data/other_data/rule.json","r",encoding="utf-8") as f:
-    CONFIG =json.load(f)['rules']
-analyzer = SentimentIntensityAnalyzer()
-
-def custom_rules(text, base_score):
-    compound = base_score["compound"]
-    t = text.lower()
-    applied = None
-
-    for rule in CONFIG:
-        for pattern in rule["patterns"]:
-            if re.search(pattern, t,re.IGNORECASE):
-                compound = max(-1.0, min(1.0, compound + rule["adjustment"]))
-                applied =rule['name']
-                break  # stop at first match
-        if applied: 
-            break
-
-    if compound >= 0.05:
-        sentiment = "positive"
-    elif compound <= -0.05:
-        sentiment = "negative"
-    else:
-        sentiment = "neutral"
-
-    return {"compound": compound, "sentiment": sentiment, "rule":applied}
-
-def explain_sentiment(text, top_n=5,matched_rule=None):
-    """return the contribution"""
-    words = re.findall(r"\b\w+\b", text.lower())
-    scored_words = []
-    for w in words:
-        if w in analyzer.lexicon:  # there is a score in VADER dictionary
-            score = analyzer.lexicon[w]
-            scored_words.append((w, score))
-    if matched_rule:
-        for rule in CONFIG:
-            if rule["name"] == matched_rule:
-                for p in rule["patterns"]:
-                    match = re.search(p, text, re.IGNORECASE)
-                    if match:
-                        adj = rule["adjustment"]
-                        # check whether match one of them
-                        hit = match.group(1) if match.lastindex else match.group(0)
-                        # remove //b
-                        hit = re.sub(r"\\b", "", hit).strip()
-                        scored_words.append((hit, adj))
-                        break  
-                break
-
-
-    positives = sorted([x for x in scored_words if x[1] > 0], key=lambda x: -x[1])[:top_n]
-    negatives = sorted([x for x in scored_words if x[1] < 0], key=lambda x: x[1])[:top_n]
-
-    return {"positives": positives, "negatives": negatives}
-
-# add safety checker of total mentions
-def safe_percent(v,total):
-        if total == 0:
-            return 0
-        return round(v/total*100, 1)
-
-@router.get("/brand/time-compare/sentiment")
-def keyword_frequency(
-    brand_name: str,
-    granularity:Literal["year","month","quarter"],
-    time1:int,
-    time2:int,
-    group_id: Optional[List[str]]=Query(None),
-    group_year:Optional[int]=None
-):
-    if brand_name not in brand_keyword_dict:
-        return {"error": f"Brand '{brand_name}' not found."}
-    # --- 2. basic query
-    query = """
-    SELECT 
-        group_id, clean_text, year, month, quarter
-    FROM chat WHERE clean_text IS NOT NULL"""
-    params = []
-    # ---- Default groups ----
-    if group_year and not group_id:
-        group_id = load_groups_by_year(group_year)
-    if not group_id:
-        group_id = load_default_groups()
-
-    # ---- 3. Filter by group_id ----
-    if group_id:
-        query += " AND group_id IN (" + ",".join(["?"] * len(group_id)) + ")"
-        params.extend(group_id)
-
-    # ---- 4. Query DuckDB ----
-    df = query_chat(query, params)
-    if df.empty:
-        return {"brand": brand_name, "total_mentions": 0, "sentiment_percent": [], "sentiment_count": [], "examples": []}
-    df["clean_text"] = df["clean_text"].fillna("").astype(str)
-    
-
-    # 4. compute sentiment analysis
-    def analyze_sentiment(texts):
-        sentiment_result = {"positive": 0, "neutral": 0, "negative": 0}
-        detailed_examples= []
-        if not texts:
-            return sentiment_result, detailed_examples
-        
-        for text in texts:
-            base = analyzer.polarity_scores(text)
-            adjusted = custom_rules(text,base)
-            sentiment_result[adjusted["sentiment"]]+=1
-            
-            # 4.5 explain the contribution
-            explanation = explain_sentiment(text, top_n=5,matched_rule=adjusted["rule"])
-            detailed_examples.append({
-                "text": text,
-                "sentiment_score": adjusted["compound"],
-                "sentiment":adjusted["sentiment"],
-                "rule_applied":adjusted["rule"],
-                "top_positive_words": explanation["positives"],
-                "top_negative_words": explanation["negatives"]
-            })
-        return sentiment_result,detailed_examples
-
-    def filter_df(df: pd.DataFrame, time: int, granularity: str):
-        if granularity == "year":
-            return df[df["year"] == time]
-        elif granularity == "month":
-            year, month = divmod(time, 100)  # 202508 → 2025, 8
-            return df[(df["year"] == year) & (df["month"] == month)]
-        elif granularity == "quarter":
-            year, q = divmod(time, 10)       # 20252 → 2025, Q2
-            return df[(df["year"] == year) & (df["quarter"] == q)]
-        else:
-            raise ValueError("Invalid granularity")
-        
-        #anlyze one subset
-    df1 = filter_df(df, time1, granularity)
-    df2 = filter_df(df, time2, granularity)
-    # 3. get the message containing brand name
-    pattern = re.compile(rf"\b{re.escape(brand_name)}\b",re.IGNORECASE)
-    text1 = [t for t in df1["clean_text"].dropna() if pattern.search(t)]
-    text2 = [t for t in df2["clean_text"].dropna() if pattern.search(t)]
-    sentiment_result1, detailed_examples1 = analyze_sentiment(text1)
-    sentiment_result2, detailed_examples2 = analyze_sentiment(text2)
-
-    total_mentions1 = len(text1)
-    total_mentions2 = len(text2)
-
-    
-    sentiment_percent_list1 = [{
-        "sentiment":k,"value": safe_percent(v,total_mentions1)
-        } for k, v in sentiment_result1.items()
-    ]
-    sentiment_count_list1 =[
-        {"sentiment":k, "value":v} for k,v in sentiment_result1.items()
-    ]
-
-    sentiment_percent_list2 = [{
-        "sentiment":k,"value": safe_percent(v ,total_mentions2)
-        } for k, v in sentiment_result2.items()
-    ]
-    sentiment_count_list2 =[
-        {"sentiment":k, "value":v} for k,v in sentiment_result2.items()
-    ]
-    
-    empty_block = {"total_mentions": 0, "sentiment_percent": [], "sentiment_count": [], "examples": []}
-
-    examples1 = []
-    for sentiment in ["positive", "neutral", "negative"]:
-        subset1 = [d for d in detailed_examples1 if d["sentiment"] == sentiment]
-        # take 2 from each sentiment 
-        examples1.extend(sorted(subset1, key=lambda x: abs(x["sentiment_score"]), reverse=True)[:2])
-    examples1 = examples1[:5]  # maximum 5 msg
-
-    examples2 = []
-    for sentiment in ["positive", "neutral", "negative"]:
-        subset2 = [d for d in detailed_examples2 if d["sentiment"] == sentiment]
-        # take 2 from each sentiment 
-        examples2.extend(sorted(subset2, key=lambda x: abs(x["sentiment_score"]), reverse=True)[:2])
-    examples2 = examples2[:5]  # maximum 5 msg
-    # two result block
-    block1 = (
-        empty_block
-        if total_mentions1 == 0
-        else {
-            "total_mentions": total_mentions1,
-            "sentiment_percent": sentiment_percent_list1,
-            "sentiment_count": sentiment_count_list1,
-            "examples": examples1,
-        }
-    )
-
-    block2 = (
-        empty_block
-        if total_mentions2 == 0
-        else {
-            "total_mentions": total_mentions2,
-            "sentiment_percent": sentiment_percent_list2,
-            "sentiment_count": sentiment_count_list2,
-            "examples": examples2,
-        }
-    )
-    
-    return {
-        "brand": brand_name,
-        "granularity": granularity,
-        "compare": {
-            str(time1): block1,
-            str(time2): block2,
-        },
-    }
 
 
 def _normalize_quotes(s: str) -> str:
@@ -488,17 +282,38 @@ def compare_consumer_perception(
     time1: int,
     time2: int,
     group_id: Optional[List[str]] = Query(None),
+    group_year:Optional[int]=None,
     top_k: int = 20,
     window_size: int = 6,
     merge_overlap: bool = True
 ):
-    df = df_cleaned.copy()
-    if group_id:
-        df = df[df["group_id"].isin(group_id)]
 
     if brand_name not in brand_keyword_dict:
         return {"error": f"Brand '{brand_name}' not found."}
+    # --- 2. basic query
+    query = """
+    SELECT 
+        group_id, clean_text, year, month, quarter,
+        row_number() over (PARTITION BY group_id ORDER BY datetime) AS row_id
+    FROM chat WHERE clean_text IS NOT NULL"""
+    params = []
+    # ---- Default groups ----
+    if group_year and not group_id:
+        group_id = load_groups_by_year(group_year)
+    if not group_id:
+        group_id = load_default_groups()
 
+    # ---- 3. Filter by group_id ----
+    if group_id:
+        query += " AND group_id IN (" + ",".join(["?"] * len(group_id)) + ")"
+        params.extend(group_id)
+
+    # ---- 4. Query DuckDB ----
+    df = query_chat(query, params)
+    if df.empty:
+        return {"error":"No data available"}
+    df["clean_text"] = df["clean_text"].fillna("").astype(str)
+    
     def filter_df(df: pd.DataFrame, time: int):
         if granularity == "year":
             return df[df["year"] == time]
