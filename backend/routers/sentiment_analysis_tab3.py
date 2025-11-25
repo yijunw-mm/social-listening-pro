@@ -182,13 +182,13 @@ def keyword_frequency(
     for sentiment in ["positive", "neutral", "negative"]:
         subset1 = [d for d in detailed_examples1 if d["sentiment"] == sentiment]
         examples1.extend(sorted(subset1, key=lambda x: abs(x["sentiment_score"]), reverse=True)[:2])
-    examples1 = examples1[:5]
+    examples1 = examples1[:6]
 
     examples2 = []
     for sentiment in ["positive", "neutral", "negative"]:
         subset2 = [d for d in detailed_examples2 if d["sentiment"] == sentiment]
         examples2.extend(sorted(subset2, key=lambda x: abs(x["sentiment_score"]), reverse=True)[:2])
-    examples2 = examples2[:5]
+    examples2 = examples2[:6]
 
     block1 = {
         "total_mentions": total_mentions1,
