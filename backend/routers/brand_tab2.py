@@ -8,9 +8,10 @@ from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
 import re
 from keybert import KeyBERT
-from sentence_transformers import SentenceTransformer, util 
+from sentence_transformers import SentenceTransformer, util
 import spacy
-from backend.data_loader import query_chat,load_default_groups,load_groups_by_year
+from transformers import pipeline
+from backend.data_loader import query_chat,load_default_groups,load_groups_by_year,get_cached_sentiment,save_sentiment_cache
 
 router = APIRouter()
 
