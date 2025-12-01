@@ -1,6 +1,7 @@
 import {
     keywordFrequency,
-    new_keywords
+    new_keywords,
+    keyword_cooccurrence
 } from '../api/api.js';
 
 // Register the datalabels plugin globally - check if available first
@@ -46,7 +47,7 @@ export async function loadAllGeneralData() {
     // Load sequentially to avoid race conditions
     console.log('Loading all general data sequentially...');
     await loadKeywordFrequency();
-    await loadNewKeywords();
+    // Note: loadNewKeywords() is only called when the Analyze button is clicked
     console.log('All general data loaded');
 }
 
@@ -140,8 +141,8 @@ function renderKeywordFrequencyChart(canvasId, data) {
     console.log('Canvas found, getting context...');
     const ctx = canvas.getContext('2d');
 
-    // Sort data in descending order by count
-    const sortedData = [...data].sort((a, b) => b.count - a.count);
+    // Sort data in descending order by count and limit to top of your choice
+    const sortedData = [...data].sort((a, b) => b.count - a.count).slice(0, 25);
 
     // Extract keywords and counts
     const keywords = sortedData.map(item => item.keyword);
@@ -149,6 +150,10 @@ function renderKeywordFrequencyChart(canvasId, data) {
 
     console.log('Keywords:', keywords);
     console.log('Counts:', counts);
+
+    // Populate the keyword selector with ALL keywords (not just top 20)
+    const allKeywords = [...data].sort((a, b) => b.count - a.count).map(item => item.keyword);
+    populateKeywordSelector(allKeywords);
 
     if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
 
@@ -169,7 +174,8 @@ function renderKeywordFrequencyChart(canvasId, data) {
             maintainAspectRatio: true,
             layout: {
                 padding: {
-                    top: 40
+                    top: 60,
+                    bottom: 30
                 }
             },
             plugins: {
@@ -188,15 +194,17 @@ function renderKeywordFrequencyChart(canvasId, data) {
                 },
                 datalabels: {
                     anchor: 'end',
-                    align: 'top',
+                    align: 'end',
+                    rotation: -45,
                     color: '#9ca3af',
                     font: {
                         weight: 'bold',
-                        size: 11
+                        size: 10
                     },
                     formatter: function(value) {
                         return value > 0 ? value : '';
-                    }
+                    },
+                    offset: 4
                 }
             },
             scales: {
@@ -211,7 +219,8 @@ function renderKeywordFrequencyChart(canvasId, data) {
                         color: '#9ca3af',
                         maxRotation: 45,
                         minRotation: 45,
-                        font: { size: 10 }
+                        autoSkip: false,
+                        font: { size: 11 }
                     },
                     grid: { color: '#3d4456' }
                 },
@@ -222,7 +231,10 @@ function renderKeywordFrequencyChart(canvasId, data) {
                         color: '#9ca3af',
                         font: { size: 14, weight: 'bold' }
                     },
-                    ticks: { color: '#9ca3af' },
+                    ticks: {
+                        color: '#9ca3af',
+                        precision: 0
+                    },
                     grid: { color: '#3d4456' },
                     beginAtZero: true
                 }
@@ -345,4 +357,100 @@ function showNoDataMessage(canvasId, message) {
     ctx.fillStyle = "#9ca3af";
     ctx.textAlign = "center";
     ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+}
+
+// ---- KEYWORD CO-OCCURRENCE ----
+export function initKeywordCooccurrence() {
+    const analyzeBtn = document.getElementById('analyzeCooccurrenceBtn');
+    const selector = document.getElementById('keywordCooccurrenceSelector');
+
+    if (!analyzeBtn || !selector) {
+        console.warn('Co-occurrence elements not found');
+        return;
+    }
+
+    analyzeBtn.addEventListener('click', async () => {
+        const selectedKeyword = selector.value;
+        if (!selectedKeyword) {
+            alert('Please select a keyword first');
+            return;
+        }
+
+        await loadCooccurrenceData(selectedKeyword);
+    });
+}
+
+export function populateKeywordSelector(keywords) {
+    const selector = document.getElementById('keywordCooccurrenceSelector');
+    if (!selector) return;
+
+    // Clear existing options except the first one
+    selector.innerHTML = '<option value="">-- Select a keyword --</option>';
+
+    // Add keywords as options
+    keywords.forEach(keyword => {
+        const option = document.createElement('option');
+        option.value = keyword;
+        option.textContent = keyword;
+        selector.appendChild(option);
+    });
+}
+
+async function loadCooccurrenceData(keyword) {
+    const loadingDiv = document.getElementById('cooccurrenceLoading');
+    const tableContainer = document.getElementById('cooccurrenceTableContainer');
+    const noDataDiv = document.getElementById('cooccurrenceNoData');
+    const tableBody = document.getElementById('cooccurrenceTableBody');
+
+    // Show loading, hide others
+    if (loadingDiv) loadingDiv.classList.remove('hidden');
+    if (tableContainer) tableContainer.classList.add('hidden');
+    if (noDataDiv) noDataDiv.classList.add('hidden');
+
+    try {
+        const params = getFilterParams();
+        params.keyword = keyword;
+        params.count_threshold = 20;
+        params.top_n = 20;
+
+        console.log('Fetching co-occurrence data with params:', params);
+        const response = await keyword_cooccurrence(params);
+
+        console.log('Co-occurrence data received:', response);
+
+        // Extract top_pairs from the response object
+        const data = response.top_pairs || [];
+
+        if (!Array.isArray(data) || data.length === 0) {
+            if (loadingDiv) loadingDiv.classList.add('hidden');
+            if (noDataDiv) noDataDiv.classList.remove('hidden');
+            return;
+        }
+
+        // Populate table
+        tableBody.innerHTML = '';
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-[#3d4456] hover:bg-[#252d3d]';
+            tr.innerHTML = `
+                <td class="px-4 py-3">${row.word1 || ''}</td>
+                <td class="px-4 py-3">${row.word2 || ''}</td>
+                <td class="px-4 py-3">${row.count || 0}</td>
+                <td class="px-4 py-3">${typeof row.pmi === 'number' ? row.pmi.toFixed(1) : 'N/A'}</td>
+            `;
+            tableBody.appendChild(tr);
+        });
+
+        // Show table, hide loading
+        if (loadingDiv) loadingDiv.classList.add('hidden');
+        if (tableContainer) tableContainer.classList.remove('hidden');
+
+    } catch (err) {
+        console.error('Error loading co-occurrence data:', err);
+        if (loadingDiv) loadingDiv.classList.add('hidden');
+        if (noDataDiv) {
+            noDataDiv.textContent = `Error: ${err.message}`;
+            noDataDiv.classList.remove('hidden');
+        }
+    }
 }

@@ -131,7 +131,7 @@
                                     />
                                     <button
                                         id="addKeywordBtn"
-                                        class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded font-medium">
+                                        class="bg-[#C990B8] hover:bg-[#B87AA8] text-white px-4 py-2 rounded font-medium">
                                         Add
                                     </button>
                                 </div>
@@ -190,7 +190,7 @@
                                     />
                                      <button
                                         id="removePerceptionWordBtn"
-                                        class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded font-medium">
+                                        class="bg-[#C990B8] hover:bg-[#B87AA8] text-white px-4 py-2 rounded font-medium">
                                         Remove
                                     </button>
                                 </div>
@@ -285,13 +285,17 @@
             // Initialize sentiment examples toggle
             initSentimentExamplesToggle();
 
-            // Listen for group chat changes and reload all charts
-            window.addEventListener('groupChatChanged', async function() {
-                const brandSelector = document.getElementById("brandSelector");
-                const selectedBrand = brandSelector ? brandSelector.value : "mamypoko";
-                console.log('Group chat selection changed, reloading all charts for brand:', selectedBrand);
-                await loadAllBrandData(selectedBrand);
-            });
+            // Listen for group chat changes and reload all charts (only once)
+            // Use flag to prevent duplicate listener registration
+            if (!window.brandPageGroupChatHandlerAttached) {
+                window.addEventListener('groupChatChanged', async function() {
+                    const brandSelector = document.getElementById("brandSelector");
+                    const selectedBrand = brandSelector ? brandSelector.value : "mamypoko";
+                    console.log('Group chat selection changed, reloading all charts for brand:', selectedBrand);
+                    await loadAllBrandData(selectedBrand);
+                });
+                window.brandPageGroupChatHandlerAttached = true;
+            }
         }
 
         // Helper function to ensure canvases are ready

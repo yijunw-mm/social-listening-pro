@@ -39,10 +39,27 @@
                     Drag and drop file here
                 </div>
 
-                <p class="text-gray-500 text-xs mt-2">Upload a zip or txt file</p>
+                <p class="text-gray-500 text-xs mt-2">Upload a zip file</p>
             </div>
 
         </div>
+
+        <style>
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+
+            .loading-spinner {
+                border: 3px solid #3d4456;
+                border-top: 3px solid #C990B8;
+                border-radius: 50%;
+                width: 24px;
+                height: 24px;
+                animation: spin 1s linear infinite;
+                display: inline-block;
+            }
+        </style>
 
     </aside>
 

@@ -15,6 +15,24 @@ function buildURL(endpoint, params = {}) {
     return url;
 }
 
+//upload file (zip or txt)
+async function uploadFile(file) {
+    const url = new URL(`${BASE_URL}/upload/`);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(url, {
+        method: "POST",
+        body: formData
+    });
+
+    if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+}
+
 //group chat number
 async function groupChat(params = {}) {
     const url = new URL(`${BASE_URL}/chat-number`);
@@ -57,7 +75,7 @@ async function availableYears(params = {}) {
     return await response.json();
 }
 
-
+//idont get how this happens like wtfffffffff, oh wtf
 //general keyword frequency
 async function keywordFrequency(params = {}) {
     const url = buildURL('/keyword-frequency', params);
@@ -77,6 +95,22 @@ async function keywordFrequency(params = {}) {
 // new_keywords
 async function new_keywords(params = {}) {
     const url = buildURL('/new-keyword-prediction', params);
+
+    const response = await fetch(url, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+}
+
+// keyword co-occurrence messages showing
+async function keyword_cooccurrence(params = {}) {
+    const url = buildURL('/keyword/co-occurrence', params);
 
     const response = await fetch(url, {
         method: "GET",
@@ -325,10 +359,12 @@ async function get_comparison_consumer_perception(params = {}) {
 }
 
 export {
+    uploadFile,
     groupChat,
     availableYears,
     keywordFrequency,
     new_keywords,
+    keyword_cooccurrence,
     get_brand_keyword,
     add_brand_keyword,
     remove_brand_keyword,

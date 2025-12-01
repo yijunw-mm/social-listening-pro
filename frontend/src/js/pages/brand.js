@@ -177,7 +177,9 @@ function renderChart(canvasId, data, configBuilder) {
 
 // ---- CONFIG BUILDERS ----
 function buildKeywordConfig(data) {
-    const sortedData = [...data].sort((a, b) => b.count - a.count);
+    // Sort by count and limit to top 20 keywords for better readability
+    const sortedData = [...data].sort((a, b) => b.count - a.count).slice(0, 20);
+
     return {
         type: "bar",
         data: {
@@ -194,15 +196,17 @@ function buildKeywordConfig(data) {
                 ...baseOptions.plugins,
                 datalabels: {
                     anchor: 'end',
-                    align: 'top',
+                    align: 'end',
+                    rotation: 45,
                     color: '#9ca3af',
                     font: {
                         weight: 'bold',
-                        size: 11
+                        size: 10
                     },
                     formatter: function(value) {
                         return value;
-                    }
+                    },
+                    offset: 4
                 }
             },
             scales: {
@@ -213,18 +217,28 @@ function buildKeywordConfig(data) {
                         color: "#9ca3af",
                         font: { size: 14, weight: 'bold' }
                     },
-                    ticks: { color: "#9ca3af" },
+                    ticks: {
+                        color: "#9ca3af",
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: false,
+                        font: { size: 11 }
+                    },
                     grid: { color: "#3d4456" }
                 },
                 y: {
                     title: {
                         display: true,
-                        text: "Count",
+                        text: "Frequency Count",
                         color: "#9ca3af",
                         font: { size: 14, weight: 'bold' }
                     },
-                    ticks: { color: "#9ca3af" },
-                    grid: { color: "#3d4456" }
+                    ticks: {
+                        color: "#9ca3af",
+                        precision: 0
+                    },
+                    grid: { color: "#3d4456" },
+                    beginAtZero: true
                 }
             }
         }

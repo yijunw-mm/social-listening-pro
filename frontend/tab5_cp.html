@@ -142,11 +142,15 @@
             initCategoryPerceptionWordFilter();
 
             // Listen for group chat changes (when checkboxes change in sidebar)
-            window.addEventListener('groupChatChanged', async () => {
-                const category = document.getElementById('categorySelector').value;
-                console.log('Group chat selection changed, reloading data for category:', category);
-                await loadConsumerPerceptionData(category);
-            });
+            // Use flag to prevent duplicate listener registration
+            if (!window.cpPageGroupChatHandlerAttached) {
+                window.addEventListener('groupChatChanged', async () => {
+                    const category = document.getElementById('categorySelector').value;
+                    console.log('Group chat selection changed, reloading data for category:', category);
+                    await loadConsumerPerceptionData(category);
+                });
+                window.cpPageGroupChatHandlerAttached = true;
+            }
 
             // Load default category on page load
             const defaultCategory = 'diaper';

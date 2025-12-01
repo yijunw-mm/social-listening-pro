@@ -1,7 +1,7 @@
 /**
  * Shared layout loader for all pages
  */
-import { groupChat, availableYears } from './api/api.js';
+import { groupChat, availableYears, uploadFile } from './api/api.js';
 
 async function loadYears() {
     try {
@@ -106,6 +106,130 @@ window.getSelectedYears = function () {
 };
 
 
+function setupUploadFunctionality() {
+    const uploadButton = document.querySelector('aside button');
+    const dropzone = document.querySelector('aside .border-dashed');
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.zip,.txt';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+
+    // Handle file upload
+    async function handleFileUpload(file) {
+        if (!file) return;
+
+        // Validate file type
+        const validTypes = ['.zip', '.txt'];
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+        if (!validTypes.includes(fileExtension)) {
+            alert('Please upload a .zip or .txt file');
+            return;
+        }
+
+        // Show loading state
+        const originalDropzoneText = dropzone.innerHTML;
+        dropzone.innerHTML = `
+            <div class="flex flex-col items-center">
+                <div class="loading-spinner mb-2"></div>
+                <p>Uploading ${file.name}...</p>
+            </div>
+        `;
+        dropzone.style.borderColor = '#C990B8';
+
+        try {
+            const result = await uploadFile(file);
+
+            // Show success message
+            dropzone.innerHTML = `
+                <div class="text-green-400">
+                    ✓ Successfully uploaded ${file.name}
+                    <br>
+                    <span class="text-xs">Group ID: ${result.group_id}, Year: ${result.group_year}</span>
+                    <br>
+                    <span class="text-xs text-gray-400">Refreshing data...</span>
+                </div>
+            `;
+            dropzone.style.borderColor = '#10b981';
+
+            // Wait a bit for backend to finish processing, then reload
+            setTimeout(async () => {
+                console.log('Refreshing years and group chats after upload...');
+                await loadYears();
+                await loadGroupChats();
+                console.log('Years and group chats refreshed successfully');
+
+                dropzone.innerHTML = originalDropzoneText;
+                dropzone.style.borderColor = '#3d4456';
+
+                // Notify that data has been updated
+                window.dispatchEvent(new Event('dataUploaded'));
+            }, 3000);
+
+        } catch (error) {
+            console.error('Upload failed:', error);
+            dropzone.innerHTML = `
+                <div class="text-red-400">
+                    ✗ Upload failed: ${error.message}
+                </div>
+            `;
+            dropzone.style.borderColor = '#ef4444';
+
+            // Reset after 3 seconds
+            setTimeout(() => {
+                dropzone.innerHTML = originalDropzoneText;
+                dropzone.style.borderColor = '#3d4456';
+            }, 3000);
+        }
+    }
+
+    // Upload button click
+    if (uploadButton) {
+        uploadButton.addEventListener('click', () => {
+            fileInput.click();
+        });
+    }
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            handleFileUpload(file);
+        }
+        fileInput.value = ''; // Reset input
+    });
+
+    // Drag and drop functionality
+    if (dropzone) {
+        dropzone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.style.borderColor = '#C990B8';
+            dropzone.style.backgroundColor = '#2a2e3f';
+        });
+
+        dropzone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropzone.style.borderColor = '#3d4456';
+            dropzone.style.backgroundColor = '#232938';
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.style.borderColor = '#3d4456';
+            dropzone.style.backgroundColor = '#232938';
+
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                handleFileUpload(file);
+            }
+        });
+    }
+}
+
 async function loadLayout(pageId) {
     try {
         // All pages are now in the frontend folder, so use relative path
@@ -124,6 +248,9 @@ async function loadLayout(pageId) {
         // Load years and group chats into selectors
         await loadYears();
         await loadGroupChats();
+
+        // Setup upload functionality
+        setupUploadFunctionality();
     } catch (error) {
         console.error('Failed to load layout:', error);
     }

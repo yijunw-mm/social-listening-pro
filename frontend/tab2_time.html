@@ -177,7 +177,7 @@
                                     />
                                     <button
                                         id="timeAddKeywordBtn"
-                                        class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded font-medium">
+                                        class="bg-[#C990B8] hover:bg-[#B87AA8] text-white px-4 py-2 rounded font-medium">
                                         Add
                                     </button>
                                 </div>
@@ -382,9 +382,13 @@
 
             // Listen for group chat changes - note: charts won't auto-reload since they require user-configured parameters
             // User needs to click Analyze button after changing group chat selection
-            window.addEventListener('groupChatChanged', function() {
-                console.log('Group chat selection changed. Click Analyze to see updated results.');
-            });
+            // Use flag to prevent duplicate listener registration
+            if (!window.timePageGroupChatHandlerAttached) {
+                window.addEventListener('groupChatChanged', function() {
+                    console.log('Group chat selection changed. Click Analyze to see updated results.');
+                });
+                window.timePageGroupChatHandlerAttached = true;
+            }
         }
 
         // Helper function to ensure canvases are ready
