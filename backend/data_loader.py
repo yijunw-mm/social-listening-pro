@@ -14,7 +14,7 @@ def get_read_connection():
     Each FastAPI/Streamlit worker thread will have its own connection
     """
     if not hasattr(_thread_local, "con"):
-        _thread_local.con = duckdb.connect(DB_PATH, read_only=True)
+        _thread_local.con = duckdb.connect(DB_PATH)
     return _thread_local.con
 
 
